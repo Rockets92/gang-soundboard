@@ -10,6 +10,301 @@ import numpy as np
 import wave
 import io
 import tempfile
+import socket
+import pickle
+import time
+
+class NetworkManager:
+    def __init__(self, soundboard_instance):
+        self.soundboard = soundboard_instance
+        self.server_port = 9999
+        self.peers = set()  # Set di IP dei peer connessi
+        self.server_socket = None
+        self.is_party_mode = False
+        self.server_running = False
+        
+    def get_local_ip(self):
+        """Ottiene l'IP locale del dispositivo"""
+        try:
+            # Prova a ottenere l'IP dalla connessione di default
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except:
+            return "127.0.0.1"
+    
+    def start_server(self):
+        """Avvia il server per ricevere connessioni"""
+        if self.server_running:
+            return
+            
+        try:
+            self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.server_socket.bind(('', self.server_port))
+            self.server_socket.listen(10)
+            self.server_running = True
+            
+            # Thread per accettare connessioni
+            threading.Thread(target=self.accept_connections, daemon=True).start()
+            print(f"Server avviato su porta {self.server_port}")
+            
+        except Exception as e:
+            print(f"Errore avvio server: {e}")
+            messagebox.showerror("Errore", f"Impossibile avviare il server: {e}")
+    
+    def accept_connections(self):
+        """Accetta connessioni in entrata"""
+        while self.server_running:
+            try:
+                client_socket, addr = self.server_socket.accept()
+                print(f"Connessione da {addr[0]}")
+                threading.Thread(target=self.handle_client, args=(client_socket, addr), daemon=True).start()
+            except:
+                break
+    
+    def handle_client(self, client_socket, addr):
+        """Gestisce un client connesso"""
+        try:
+            while self.server_running:
+                data = client_socket.recv(4096)
+                if not data:
+                    break
+                    
+                # Deserializza il messaggio
+                message = pickle.loads(data)
+                
+                if message['type'] == 'sound_trigger':
+                    # Riproduci il suono localmente
+                    self.soundboard.play_sound_by_position(message['row'], message['col'])
+                elif message['type'] == 'peer_discovery':
+                    # Risposta alla discovery
+                    response = {
+                        'type': 'peer_response',
+                        'ip': self.get_local_ip()
+                    }
+                    client_socket.send(pickle.dumps(response))
+                    
+        except Exception as e:
+            print(f"Errore gestione client {addr[0]}: {e}")
+        finally:
+            client_socket.close()
+    
+    def connect_to_peer(self, peer_ip):
+        """Connette a un peer specificato"""
+        try:
+            # Test di connessione
+            test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            test_socket.settimeout(3)
+            result = test_socket.connect_ex((peer_ip, self.server_port))
+            test_socket.close()
+            
+            if result == 0:
+                self.peers.add(peer_ip)
+                print(f"Peer {peer_ip} aggiunto")
+                return True
+            else:
+                return False
+        except:
+            return False
+    
+    def discover_peers(self):
+        """Scopre automaticamente i peer sulla rete locale"""
+        local_ip = self.get_local_ip()
+        network = '.'.join(local_ip.split('.')[:-1]) + '.'
+        
+        def scan_ip(ip):
+            if ip != local_ip:  # Non scansionare se stesso
+                if self.connect_to_peer(ip):
+                    return ip
+            return None
+        
+        # Scansiona la rete locale (solo primi 20 IP per velocità)
+        threads = []
+        for i in range(1, 21):
+            ip = network + str(i)
+            thread = threading.Thread(target=scan_ip, args=(ip,))
+            thread.start()
+            threads.append(thread)
+        
+        # Aspetta che tutte le scansioni finiscano
+        for thread in threads:
+            thread.join()
+    
+    def broadcast_sound(self, row, col):
+        """Invia il trigger del suono a tutti i peer"""
+        if not self.is_party_mode or not self.peers:
+            return
+            
+        message = {
+            'type': 'sound_trigger',
+            'row': row,
+            'col': col,
+            'timestamp': time.time()
+        }
+        
+        data = pickle.dumps(message)
+        
+        # Invia a tutti i peer
+        dead_peers = set()
+        for peer_ip in self.peers.copy():
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(2)
+                sock.connect((peer_ip, self.server_port))
+                sock.send(data)
+                sock.close()
+            except:
+                print(f"Peer {peer_ip} non raggiungibile, rimozione...")
+                dead_peers.add(peer_ip)
+        
+        # Rimuovi peer non raggiungibili
+        self.peers -= dead_peers
+    
+    def stop_server(self):
+        """Ferma il server"""
+        self.server_running = False
+        if self.server_socket:
+            self.server_socket.close()
+        self.peers.clear()
+
+class PartyModeDialog:
+    def __init__(self, parent, network_manager):
+        self.parent = parent
+        self.network_manager = network_manager
+        self.setup_ui()
+    
+    def setup_ui(self):
+        self.window = tk.Toplevel(self.parent)
+        self.window.title("Modalità Party")
+        self.window.geometry("500x400")
+        self.window.transient(self.parent)
+        self.window.grab_set()
+        
+        main_frame = ttk.Frame(self.window, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Stato attuale
+        status_frame = ttk.LabelFrame(main_frame, text="Stato", padding="5")
+        status_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        self.status_label = ttk.Label(status_frame, text="Modalità Party: Disattivata")
+        self.status_label.pack()
+        
+        local_ip = self.network_manager.get_local_ip()
+        ttk.Label(status_frame, text=f"IP locale: {local_ip}").pack()
+        
+        # Controlli
+        control_frame = ttk.LabelFrame(main_frame, text="Controlli", padding="5")
+        control_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        self.toggle_button = ttk.Button(control_frame, text="Attiva Modalità Party", 
+                                       command=self.toggle_party_mode)
+        self.toggle_button.pack(pady=5)
+        
+        ttk.Button(control_frame, text="Scopri Peer Automaticamente", 
+                  command=self.discover_peers).pack(pady=2)
+        
+        # Connessione manuale
+        manual_frame = ttk.LabelFrame(main_frame, text="Connessione Manuale", padding="5")
+        manual_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        connection_frame = ttk.Frame(manual_frame)
+        connection_frame.pack(fill=tk.X)
+        
+        ttk.Label(connection_frame, text="IP Peer:").pack(side=tk.LEFT)
+        self.ip_entry = ttk.Entry(connection_frame, width=15)
+        self.ip_entry.pack(side=tk.LEFT, padx=5)
+        ttk.Button(connection_frame, text="Connetti", command=self.connect_manual).pack(side=tk.LEFT)
+        
+        # Lista peer
+        peers_frame = ttk.LabelFrame(main_frame, text="Peer Connessi", padding="5")
+        peers_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Listbox con scrollbar
+        list_frame = ttk.Frame(peers_frame)
+        list_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.peers_listbox = tk.Listbox(list_frame)
+        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.peers_listbox.yview)
+        self.peers_listbox.configure(yscrollcommand=scrollbar.set)
+        
+        self.peers_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Pulsanti gestione peer
+        peer_buttons = ttk.Frame(peers_frame)
+        peer_buttons.pack(fill=tk.X, pady=(5, 0))
+        
+        ttk.Button(peer_buttons, text="Rimuovi Selezionato", 
+                  command=self.remove_peer).pack(side=tk.LEFT, padx=2)
+        ttk.Button(peer_buttons, text="Aggiorna Lista", 
+                  command=self.update_peers_list).pack(side=tk.LEFT, padx=2)
+        
+        # Aggiorna la lista iniziale
+        self.update_peers_list()
+        self.update_status()
+    
+    def toggle_party_mode(self):
+        if self.network_manager.is_party_mode:
+            # Disattiva
+            self.network_manager.is_party_mode = False
+            self.network_manager.stop_server()
+            self.toggle_button.config(text="Attiva Modalità Party")
+        else:
+            # Attiva
+            self.network_manager.start_server()
+            self.network_manager.is_party_mode = True
+            self.toggle_button.config(text="Disattiva Modalità Party")
+        
+        self.update_status()
+    
+    def discover_peers(self):
+        self.status_label.config(text="Ricerca peer in corso...")
+        self.window.update()
+        
+        # Esegui discovery in thread separato
+        def do_discovery():
+            self.network_manager.discover_peers()
+            self.window.after(0, lambda: [
+                self.update_peers_list(),
+                self.update_status()
+            ])
+        
+        threading.Thread(target=do_discovery, daemon=True).start()
+    
+    def connect_manual(self):
+        ip = self.ip_entry.get().strip()
+        if not ip:
+            messagebox.showerror("Errore", "Inserire un IP valido")
+            return
+        
+        if self.network_manager.connect_to_peer(ip):
+            messagebox.showinfo("Successo", f"Connesso a {ip}")
+            self.update_peers_list()
+        else:
+            messagebox.showerror("Errore", f"Impossibile connettersi a {ip}")
+    
+    def remove_peer(self):
+        selection = self.peers_listbox.curselection()
+        if selection:
+            peer_ip = self.peers_listbox.get(selection[0])
+            self.network_manager.peers.discard(peer_ip)
+            self.update_peers_list()
+    
+    def update_peers_list(self):
+        self.peers_listbox.delete(0, tk.END)
+        for peer in sorted(self.network_manager.peers):
+            self.peers_listbox.insert(tk.END, peer)
+    
+    def update_status(self):
+        if self.network_manager.is_party_mode:
+            peer_count = len(self.network_manager.peers)
+            self.status_label.config(text=f"Modalità Party: Attiva ({peer_count} peer)")
+        else:
+            self.status_label.config(text="Modalità Party: Disattivata")
 
 class AudioTrimmer:
     def __init__(self, parent, audio_file_path, callback):
@@ -354,6 +649,9 @@ class SoundButton:
             # Riproduci il suono in un thread separato
             threading.Thread(target=self.sound_object.play, daemon=True).start()
             
+            # Notifica la soundboard per il broadcast di rete
+            self.callback(self.row, self.col)
+            
     def get_config(self):
         return {
             'label': self.label,
@@ -398,6 +696,9 @@ class Soundboard:
         pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=1024)
         pygame.mixer.init()
         
+        # Inizializza il network manager
+        self.network_manager = NetworkManager(self)
+        
         # Griglia 4x5 di tasti
         self.buttons = []
         self.setup_ui()
@@ -424,11 +725,23 @@ class Soundboard:
         file_menu.add_command(label="Carica Configurazione", command=self.load_config)
         file_menu.add_command(label="Esci", command=self.on_closing)
         
+        # Menu per modalità party
+        party_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Party Mode", menu=party_menu)
+        party_menu.add_command(label="Configurazione Party", command=self.open_party_dialog)
+        
         # Toolbar
         toolbar = ttk.Frame(self.root)
         toolbar.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=5, pady=5)
         
         ttk.Label(toolbar, text="Soundboard Personalizzabile", font=("Arial", 12, "bold")).pack(side=tk.LEFT)
+        
+        # Indicatore stato party
+        self.party_status_label = ttk.Label(toolbar, text="Party: OFF", foreground="red")
+        self.party_status_label.pack(side=tk.RIGHT, padx=10)
+        
+        # Aggiorna stato party ogni secondo
+        self.update_party_status()
         
     def setup_grid(self):
         # Frame per la griglia
@@ -448,10 +761,34 @@ class Soundboard:
                 btn = SoundButton(self.grid_frame, row, col, self.button_callback)
                 button_row.append(btn)
             self.buttons.append(button_row)
-            
-    def button_callback(self, button):
-        # Callback per i tasti (se necessario)
-        pass
+    
+    def button_callback(self, row, col):
+        """Callback chiamato quando un tasto viene premuto"""
+        # Invia il trigger ai peer se in modalità party
+        if self.network_manager.is_party_mode:
+            self.network_manager.broadcast_sound(row, col)
+    
+    def play_sound_by_position(self, row, col):
+        """Riproduci suono in base alla posizione (chiamato dalla rete)"""
+        if 0 <= row < len(self.buttons) and 0 <= col < len(self.buttons[row]):
+            button = self.buttons[row][col]
+            if button.sound_object:
+                threading.Thread(target=button.sound_object.play, daemon=True).start()
+    
+    def open_party_dialog(self):
+        """Apre la finestra di configurazione party"""
+        PartyModeDialog(self.root, self.network_manager)
+    
+    def update_party_status(self):
+        """Aggiorna l'indicatore di stato party"""
+        if self.network_manager.is_party_mode:
+            peer_count = len(self.network_manager.peers)
+            self.party_status_label.config(text=f"Party: ON ({peer_count})", foreground="green")
+        else:
+            self.party_status_label.config(text="Party: OFF", foreground="red")
+        
+        # Richiama ogni secondo
+        self.root.after(1000, self.update_party_status)
         
     def save_config(self):
         config = {
@@ -488,6 +825,9 @@ class Soundboard:
     def on_closing(self):
         # Salva automaticamente la configurazione
         self.save_config()
+        
+        # Ferma il network manager
+        self.network_manager.stop_server()
         
         # Rimuovi tutti gli hotkey
         for row in self.buttons:

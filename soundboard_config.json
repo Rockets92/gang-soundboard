@@ -1,0 +1,134 @@
+{
+  "buttons": [
+    [
+      {
+        "label": "Tasto 0-0",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "Tasto 0-1",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "Tasto 0-2",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "Tasto 0-3",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      }
+    ],
+    [
+      {
+        "label": "Tasto 1-0",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "Tasto 1-1",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "Tasto 1-2",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "Tasto 1-3",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      }
+    ],
+    [
+      {
+        "label": "Tasto 2-0",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "Tasto 2-1",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "Tasto 2-2",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "Tasto 2-3",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      }
+    ],
+    [
+      {
+        "label": "Tasto 3-0",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "Tasto 3-1",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "Tasto 3-2",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "Tasto 3-3",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      }
+    ],
+    [
+      {
+        "label": "Tasto 4-0",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "Tasto 4-1",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "Tasto 4-2",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "Tasto 4-3",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      }
+    ]
+  ]
+}
