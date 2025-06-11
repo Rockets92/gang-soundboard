@@ -4,12 +4,15 @@ import sys
 def install_packages():
     packages = [
         'pygame>=2.1.0',
-        'Pillow>=9.0.0', 
+        'Pillow>=9.0.0',
         'keyboard>=0.13.5',
-        'numpy>=1.21.0'
+        'numpy>=1.21.0',
+        'PyQt6>=6.5.0',
+        'qt-material>=2.14',
+        'qdarkstyle>=3.0.3'
     ]
     
-    print("Installazione dipendenze per Python 3.13...")
+    print("Installazione dipendenze per UI stile glass + Material 3...")
     
     for package in packages:
         try:
