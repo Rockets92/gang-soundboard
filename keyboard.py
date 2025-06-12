@@ -49,12 +49,20 @@ class KeyboardWindow(QMainWindow):
         stack.addWidget(self.keyboard_frame)
         stack.setCurrentWidget(self.keyboard_frame)
         self.glass_container.setLayout(stack)
+        # Prepare keyboard_frame layout (only once)
+        self.keyboard_layout = QVBoxLayout(self.keyboard_frame)
+        self.keyboard_layout.setContentsMargins(20,20,20,20)
+        self.keyboard_layout.setSpacing(12)
+        self.grid_layout = QGridLayout()
+        self.grid_layout.setSpacing(12)
+        self.keyboard_layout.addLayout(self.grid_layout)
 
 
         # Costruzione dinamica della tastiera in base alle preferenze salvate
-        layout_type = self.settings.value("size_combo", "65%") if hasattr(self, 'settings') else "65%"
-        key_format = self.settings.value("format_combo", "ANSI") if hasattr(self, 'settings') else "ANSI"
-        lang = self.settings.value("lang_combo", "US English") if hasattr(self, 'settings') else "US English"
+        settings    = QSettings("GangSoundboard", "KeyboardApp")
+        layout_type = settings.value("size_combo", "65%")
+        key_format  = settings.value("format_combo", "ANSI")
+        lang        = settings.value("lang_combo", "US English")
 
         if layout_type in ["60%", "65%", "TKL"]:
             rows = [
@@ -76,17 +84,6 @@ class KeyboardWindow(QMainWindow):
                 ['Shift', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', ',', '.', '/', 'Shift']
             ]
 
-        self.glass_container.adjustSize()
-        key_width = 60
-        key_height = 60
-        spacing = 12
-        num_rows = len(rows)
-        num_cols = max(len(r) for r in rows)
-
-        total_width = (key_width + spacing) * num_cols - spacing + 40
-        total_height = (key_height + spacing) * num_rows - spacing + 40
-
-        self.glass_container.setFixedSize(total_width, total_height)
 
         # Add drop shadow to keyboard container for 3D effect
         container_shadow = QGraphicsDropShadowEffect(self.glass_container)
@@ -248,10 +245,15 @@ class KeyboardWindow(QMainWindow):
             shadow.setColor(QColor(0, 0, 0, 80))
             combo.setGraphicsEffect(shadow)
             controls_layout.addWidget(combo)
+        # QSettings for persistence and combo attributes
+        self.settings = QSettings("GangSoundboard", "KeyboardApp")
+        self.size_combo = size_combo
+        self.format_combo = format_combo
+        self.lang_combo = lang_combo
         # Connetti segnali per salvare le modifiche
-        size_combo.currentTextChanged.connect(lambda val: self.settings.setValue("size_combo", val))
-        format_combo.currentTextChanged.connect(lambda val: self.settings.setValue("format_combo", val))
-        lang_combo.currentTextChanged.connect(lambda val: self.settings.setValue("lang_combo", val))
+        size_combo.currentTextChanged.connect(lambda val: (self.settings.setValue("size_combo", val), self.build_keyboard()))
+        format_combo.currentTextChanged.connect(lambda val: (self.settings.setValue("format_combo", val), self.build_keyboard()))
+        lang_combo.currentTextChanged.connect(lambda val: (self.settings.setValue("lang_combo", val), self.build_keyboard()))
         # Salva l'indice del tab selezionato
         tab_bar.currentChanged.connect(lambda index: self.settings.setValue("tab_index", index))
         # QSettings per persistenza
@@ -274,57 +276,15 @@ class KeyboardWindow(QMainWindow):
 
         # Keep track of combos and spacing
         self.combos = [size_combo, format_combo, lang_combo]
+        self.size_combo = size_combo
+        self.format_combo = format_combo
+        self.lang_combo = lang_combo
         self.controls_spacing = controls_layout.spacing()
         QTimer.singleShot(0, self.adjust_combo_widths)
+        # Schedule initial keyboard build after the window is shown
+        QTimer.singleShot(0, self.build_keyboard)
 
-        # Layout inside keyboard_frame: controls + keyboard grid
-        keyboard_layout = QVBoxLayout(self.keyboard_frame)
-        keyboard_layout.setContentsMargins(20, 20, 20, 20)
-        keyboard_layout.setSpacing(12)
-
-        # Keyboard grid
-        grid_layout = QGridLayout()
-        grid_layout.setSpacing(12)
-
-        # Key width multipliers for special keys
-        key_spans = {
-            'Tab': 1.5, 'Caps': 1.75, 'Shift': 2.25, 'Enter': 2,
-            'Backspace': 2, 'Del': 1.5, 'Space': 6, 'Esc': 1.25,
-        }
-
-        # Aggiunta dei tasti al layout
-        for row_idx, row_keys in enumerate(rows):
-            col_idx = 0
-            for key in row_keys:
-                span = key_spans.get(key, 1)
-                btn = QPushButton(key)
-                btn.setMinimumSize(int(60 * span + (span - 1) * 12), 60)
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: rgba(255, 255, 255, 0.15);
-                        border: 1px solid rgba(255, 255, 255, 0.4);
-                        border-radius: 8px;
-                        color: #3A76A5;
-                        font-size: 20px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: rgba(255, 255, 255, 0.25);
-                    }
-                    QPushButton:pressed {
-                        background-color: rgba(255, 255, 255, 0.35);
-                    }
-                """)
-                shadow = QGraphicsDropShadowEffect(btn)
-                shadow.setBlurRadius(15)
-                shadow.setOffset(0, 4)
-                shadow.setColor(QColor(0, 0, 0, 80))
-                btn.setGraphicsEffect(shadow)
-                grid_layout.addWidget(btn, row_idx, col_idx, 1, int(span))
-                col_idx += int(span)
-
-        # Attach grid layout below controls
-        keyboard_layout.addLayout(grid_layout)
+        # Center glass container horizontally
 
         # Center glass container horizontally
         hbox = QHBoxLayout()
@@ -359,9 +319,110 @@ class KeyboardWindow(QMainWindow):
         slider_width = self.tab_bar.width()
         self.slider.setFixedWidth(slider_width)
 
+    def build_keyboard(self):
+        # Determine key layout based on dropdown
+        layout_type = self.size_combo.currentText()
+        if layout_type == "60%":
+            rows = [
+                ['Esc','1','2','3','4','5','6','7','8','9','0','-','=','Backspace'],
+                ['Tab','Q','W','E','R','T','Y','U','I','O','P','[',']','\\'],
+                ['Caps','A','S','D','F','G','H','J','K','L',';','\'','Enter'],
+                ['Shift','Z','X','C','V','B','N','M',',','.','/','Shift'],
+                ['Ctrl','Win','Alt','Space','Alt','Fn','Ctrl']
+            ]
+        elif layout_type == "65%":
+            rows = [
+                ['Esc','1','2','3','4','5','6','7','8','9','0','-','=','Backspace'],
+                ['Tab','Q','W','E','R','T','Y','U','I','O','P','[',']','\\'],
+                ['Caps','A','S','D','F','G','H','J','K','L',';','\'','Enter'],
+                ['Shift','Z','X','C','V','B','N','M',',','.','/','Shift'],
+                ['Ctrl','Win','Alt','Space','Alt']
+            ]
+        elif layout_type == "TKL":
+            rows = [
+                ['Esc','1','2','3','4','5','6','7','8','9','0','Backspace'],
+                ['Tab','Q','W','E','R','T','Y','U','I','O','P','[',']'],
+                ['Caps','A','S','D','F','G','H','J','K','L',';','\''],
+                ['Shift','Z','X','C','V','B','N','M',',','.','/','Shift'],
+                ['Ctrl','Win','Alt','Space','Alt','Fn','Ctrl']
+            ]
+        elif layout_type == "75%":
+            rows = [
+                ['Esc','Q','W','E','R','T','Y','U','I','O','P','Del'],
+                ['Tab','A','S','D','F','G','H','J','K','L',';'],
+                ['Shift','Z','X','C','V','B','N','M',',','.'],
+            ]
+        else:
+            rows = [
+                ['Esc','1','2','3','4','5','6','7','8','9','0','Del'],
+                ['Tab','Q','W','E','R','T','Y','U','I','O','P','[',']'],
+                ['Caps','A','S','D','F','G','H','J','K','L',';','\''],
+                ['Shift','Z','X','C','V','B','N','M',',','.','/','Shift']
+            ]
+        key_spans = {
+            'Tab':1.5, 'Caps':1.75, 'Shift':2.25, 'Enter':2,
+            'Backspace':2, 'Del':1.5, 'Space':6, 'Esc':1.25
+        }
+        # Dynamic sizing: calculate key dimensions to fit the frame
+        margins = 20
+        spacing = 12
+        rows_count = len(rows)
+        max_span = max(sum(key_spans.get(k, 1) for k in row_keys) for row_keys in rows)
+        avail_w = self.keyboard_frame.width() - 2 * margins
+        avail_h = self.keyboard_frame.height() - 2 * margins
+        if avail_w <= 0 or avail_h <= 0:
+            # Fallback to default key size before layout is applied
+            cell_w = 60
+            cell_h = 60
+        else:
+            cell_w = (avail_w - (max_span - 1) * spacing) / max_span
+            cell_h = (avail_h - (rows_count - 1) * spacing) / rows_count
+        # Clear previous keys
+        while self.grid_layout.count():
+            item = self.grid_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+        # Populate grid
+        for r, row_keys in enumerate(rows):
+            c = 0
+            for key in row_keys:
+                span = key_spans.get(key,1)
+                btn = QPushButton(key)
+                btn.setFixedSize(int(cell_w * span + (span - 1) * spacing), int(cell_h))
+                btn.setStyleSheet('''
+QPushButton {
+    background-color: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 8px;
+    color: #3A76A5;
+    font-size: 8px;
+    font-weight: bold;
+}
+QPushButton:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+}
+QPushButton:pressed {
+    background-color: rgba(255, 255, 255, 0.35);
+}
+''')
+                shadow = QGraphicsDropShadowEffect(btn)
+                shadow.setBlurRadius(15)
+                shadow.setOffset(0,4)
+                shadow.setColor(QColor(0,0,0,80))
+                btn.setGraphicsEffect(shadow)
+                self.grid_layout.addWidget(btn, r, c, 1, int(span))
+                c += int(span)
+
+        # Adjust glass container size to fit new layout
+        total_width = int(cell_w * max_span + (max_span - 1) * spacing + 2 * margins)
+        total_height = int(cell_h * rows_count + (rows_count - 1) * spacing + 2 * margins)
+        self.glass_container.setFixedSize(total_width, total_height)
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.adjust_combo_widths()
+      
 
 def main():
     app = QApplication(sys.argv)
