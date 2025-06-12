@@ -10,6 +10,7 @@ import numpy as np
 import wave
 import io
 import tempfile
+import platform
 
 class AudioTrimmer:
     def __init__(self, parent, audio_file_path, callback):
@@ -245,10 +246,100 @@ class SoundButton:
         self.context_menu.add_command(label="Rinomina", command=self.rename_button)
         self.context_menu.add_command(label="Rimuovi", command=self.clear_button)
         
-        self.button.bind("<Button-3>", self.show_context_menu)  # Click destro
+        # Binding multipli per compatibilità cross-platform
+        self.setup_context_menu_bindings()
+        
+    def setup_context_menu_bindings(self):
+        """Configura i binding del menu contestuale per tutte le piattaforme"""
+        # Rileva il sistema operativo
+        system = platform.system()
+        
+        if system == "Darwin":  # macOS
+            # Su Mac, usa Control+Click o Button-2
+            self.button.bind("<Button-2>", self.show_context_menu)
+            self.button.bind("<Control-Button-1>", self.show_context_menu)
+        elif system == "Linux":
+            # Su Linux, usa Button-3 (click destro)
+            self.button.bind("<Button-3>", self.show_context_menu)
+        else:  # Windows e altri
+            # Su Windows, usa Button-3 (click destro)
+            self.button.bind("<Button-3>", self.show_context_menu)
+        
+        # Aggiungi anche un doppio click come alternativa universale
+        self.button.bind("<Double-Button-1>", self.show_context_menu_alt)
         
     def show_context_menu(self, event):
-        self.context_menu.post(event.x_root, event.y_root)
+        """Mostra il menu contestuale"""
+        try:
+            self.context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.context_menu.grab_release()
+    
+    def show_context_menu_alt(self, event):
+        """Menu contestuale alternativo per doppio click"""
+        # Mostra una finestra di dialogo con le opzioni principali
+        choice = messagebox.askyesnocancel(
+            "Configura Tasto", 
+            f"Vuoi configurare il tasto '{self.label}'?\n\n"
+            "Sì = Carica Audio\n"
+            "No = Altre opzioni\n"
+            "Annulla = Chiudi"
+        )
+        
+        if choice is True:
+            self.load_audio()
+        elif choice is False:
+            self.show_options_dialog()
+    
+    def show_options_dialog(self):
+        """Mostra finestra di dialogo con tutte le opzioni"""
+        dialog = tk.Toplevel(self.parent.master)
+        dialog.title(f"Configura {self.label}")
+        dialog.geometry("300x250")
+        dialog.transient(self.parent.master)
+        dialog.grab_set()
+        
+        # Centra la finestra
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (300 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (250 // 2)
+        dialog.geometry(f"300x250+{x}+{y}")
+        
+        # Frame principale
+        main_frame = ttk.Frame(dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Titolo
+        ttk.Label(main_frame, text=f"Configura {self.label}", 
+                 font=("Arial", 12, "bold")).pack(pady=(0, 20))
+        
+        # Pulsanti delle opzioni
+        btn_style = {'width': 20, 'pady': 5}
+        
+        ttk.Button(main_frame, text="🎵 Carica Audio", 
+                  command=lambda: [self.load_audio(), dialog.destroy()], 
+                  **btn_style).pack(pady=5)
+        
+        ttk.Button(main_frame, text="🖼️ Carica Immagine", 
+                  command=lambda: [self.load_image(), dialog.destroy()], 
+                  **btn_style).pack(pady=5)
+        
+        ttk.Button(main_frame, text="⌨️ Imposta Hotkey", 
+                  command=lambda: [self.set_hotkey(), dialog.destroy()], 
+                  **btn_style).pack(pady=5)
+        
+        ttk.Button(main_frame, text="✏️ Rinomina", 
+                  command=lambda: [self.rename_button(), dialog.destroy()], 
+                  **btn_style).pack(pady=5)
+        
+        ttk.Button(main_frame, text="🗑️ Rimuovi", 
+                  command=lambda: [self.clear_button(), dialog.destroy()], 
+                  **btn_style).pack(pady=5)
+        
+        # Pulsante chiudi
+        ttk.Button(main_frame, text="❌ Chiudi", 
+                  command=dialog.destroy, 
+                  **btn_style).pack(pady=(20, 0))
         
     def load_audio(self):
         file_path = filedialog.askopenfilename(
@@ -413,6 +504,21 @@ class Soundboard:
         # Gestione chiusura finestra
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
+        # Mostra istruzioni per Mac se necessario
+        self.show_platform_instructions()
+        
+    def show_platform_instructions(self):
+        """Mostra istruzioni specifiche per la piattaforma"""
+        if platform.system() == "Darwin":  # macOS
+            messagebox.showinfo(
+                "Istruzioni per Mac", 
+                "Per configurare i tasti:\n\n"
+                "• Control + Click sui tasti\n"
+                "• Oppure doppio-click\n"
+                "• Oppure click con il tasto centrale del mouse\n\n"
+                "Questo messaggio apparirà solo al primo avvio."
+            )
+        
     def setup_ui(self):
         # Menu
         menubar = tk.Menu(self.root)
@@ -422,6 +528,7 @@ class Soundboard:
         menubar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Salva Configurazione", command=self.save_config)
         file_menu.add_command(label="Carica Configurazione", command=self.load_config)
+        file_menu.add_command(label="Mostra Istruzioni", command=self.show_help)
         file_menu.add_command(label="Esci", command=self.on_closing)
         
         # Toolbar
@@ -429,6 +536,47 @@ class Soundboard:
         toolbar.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=5, pady=5)
         
         ttk.Label(toolbar, text="Soundboard Personalizzabile", font=("Arial", 12, "bold")).pack(side=tk.LEFT)
+        
+        # Aggiungi etichetta con istruzioni per Mac
+        if platform.system() == "Darwin":
+            ttk.Label(toolbar, text="💡 Mac: Control+Click o doppio-click per configurare", 
+                     foreground="blue", font=("Arial", 9)).pack(side=tk.RIGHT)
+    
+    def show_help(self):
+        """Mostra finestra di aiuto"""
+        help_text = """
+ISTRUZIONI D'USO:
+
+🎵 Per aggiungere suoni:
+"""
+        
+        if platform.system() == "Darwin":  # macOS
+            help_text += """• Control + Click sui tasti
+• Oppure doppio-click sui tasti
+• Oppure click con tasto centrale del mouse"""
+        else:
+            help_text += """• Click destro sui tasti"""
+            
+        help_text += """
+
+🎮 Funzionalità:
+• Carica file audio (MP3, WAV, OGG, etc.)
+• Taglia audio prima di aggiungerlo
+• Aggiungi immagini ai tasti
+• Imposta hotkey (scorciatoie da tastiera)
+• Rinomina i tasti
+• Salvataggio automatico della configurazione
+
+⌨️ Hotkey:
+Usa combinazioni come: ctrl+1, alt+a, shift+space, etc.
+
+🎛️ Audio Trimmer:
+• Regola inizio e fine del suono
+• Ascolta anteprima prima di confermare
+• Usa i slider per selezione visuale
+        """
+        
+        messagebox.showinfo("Istruzioni", help_text)
         
     def setup_grid(self):
         # Frame per la griglia
