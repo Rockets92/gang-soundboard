@@ -715,26 +715,33 @@ class Soundboard:
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
     def setup_ui(self):
-        # Menu
+        # Menu - versione semplificata per macOS
         menubar = tk.Menu(self.root)
         self.root.config(menu=menubar)
         
-        file_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="Salva Configurazione", command=self.save_config)
-        file_menu.add_command(label="Carica Configurazione", command=self.load_config)
-        file_menu.add_command(label="Esci", command=self.on_closing)
+        # Menu principale con tutti i comandi
+        main_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Menu", menu=main_menu)
+        main_menu.add_command(label="Salva Configurazione", command=self.save_config)
+        main_menu.add_command(label="Carica Configurazione", command=self.load_config)
+        main_menu.add_separator()
+        main_menu.add_command(label="Configurazione Party", command=self.open_party_dialog)
+        main_menu.add_separator()
+        main_menu.add_command(label="Esci", command=self.on_closing)
         
-        # Menu per modalità party
-        party_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Party Mode", menu=party_menu)
-        party_menu.add_command(label="Configurazione Party", command=self.open_party_dialog)
-        
-        # Toolbar
+        # Toolbar con pulsanti principali
         toolbar = ttk.Frame(self.root)
         toolbar.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=5, pady=5)
         
         ttk.Label(toolbar, text="Soundboard Personalizzabile", font=("Arial", 12, "bold")).pack(side=tk.LEFT)
+        
+        # Pulsanti nella toolbar
+        button_frame = ttk.Frame(toolbar)
+        button_frame.pack(side=tk.LEFT, padx=20)
+        
+        ttk.Button(button_frame, text="Salva", command=self.save_config).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="Carica", command=self.load_config).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="Party Mode", command=self.open_party_dialog).pack(side=tk.LEFT, padx=2)
         
         # Indicatore stato party
         self.party_status_label = ttk.Label(toolbar, text="Party: OFF", foreground="red")
