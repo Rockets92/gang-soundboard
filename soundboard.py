@@ -24,16 +24,52 @@ class NetworkManager:
         self.server_running = False
         
     def get_local_ip(self):
-        """Ottiene l'IP locale del dispositivo"""
+        """Ottiene l'IP locale del dispositivo - versione migliorata"""
         try:
-            # Prova a ottenere l'IP dalla connessione di default
+            # Metodo 1: connessione verso Google DNS
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(5)
             s.connect(("8.8.8.8", 80))
             ip = s.getsockname()[0]
             s.close()
-            return ip
-        except:
-            return "127.0.0.1"
+            
+            # Verifica che non sia un IP di loopback
+            if not ip.startswith('127.'):
+                return ip
+                
+        except Exception as e:
+            print(f"Metodo 1 fallito: {e}")
+        
+        try:
+            # Metodo 2: hostname
+            hostname = socket.gethostname()
+            ip = socket.gethostbyname(hostname)
+            if not ip.startswith('127.'):
+                return ip
+        except Exception as e:
+            print(f"Metodo 2 fallito: {e}")
+        
+        try:
+            # Metodo 3: interfacce di rete (macOS/Linux)
+            import subprocess
+            
+            # Su macOS, usa ifconfig
+            if os.uname().sysname == 'Darwin':
+                result = subprocess.run(['ifconfig'], capture_output=True, text=True)
+                lines = result.stdout.split('\n')
+                for line in lines:
+                    if 'inet ' in line and '127.0.0.1' not in line and 'inet 169.254' not in line:
+                        parts = line.strip().split()
+                        for i, part in enumerate(parts):
+                            if part == 'inet' and i + 1 < len(parts):
+                                ip = parts[i + 1]
+                                if '.' in ip and not ip.startswith('127.'):
+                                    return ip
+        except Exception as e:
+            print(f"Metodo 3 fallito: {e}")
+        
+        # Fallback
+        return "127.0.0.1"
     
     def start_server(self):
         """Avvia il server per ricevere connessioni"""
@@ -113,25 +149,97 @@ class NetworkManager:
     def discover_peers(self):
         """Scopre automaticamente i peer sulla rete locale"""
         local_ip = self.get_local_ip()
-        network = '.'.join(local_ip.split('.')[:-1]) + '.'
+        print(f"IP locale: {local_ip}")
+        
+        # Estrai la rete (supporta sia /24 che altre subnet)
+        ip_parts = local_ip.split('.')
+        if len(ip_parts) != 4:
+            print("IP locale non valido")
+            return
+            
+        network_base = '.'.join(ip_parts[:-1]) + '.'
+        print(f"Scansione rete: {network_base}x")
+        
+        # Lista per tracciare i risultati
+        found_peers = []
         
         def scan_ip(ip):
-            if ip != local_ip:  # Non scansionare se stesso
-                if self.connect_to_peer(ip):
-                    return ip
+            """Scansiona un singolo IP"""
+            if ip == local_ip:  # Non scansionare se stesso
+                return None
+                
+            try:
+                print(f"Scansione {ip}...")
+                test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                test_socket.settimeout(2)  # Timeout ridotto per velocità
+                result = test_socket.connect_ex((ip, self.server_port))
+                test_socket.close()
+                
+                if result == 0:
+                    print(f"✓ Peer trovato: {ip}")
+                    # Testa se è realmente un peer soundboard
+                    if self.test_peer_connection(ip):
+                        self.peers.add(ip)
+                        found_peers.append(ip)
+                        return ip
+                    else:
+                        print(f"  → {ip} non è un peer soundboard valido")
+                else:
+                    print(f"✗ {ip}: porta chiusa")
+                    
+            except Exception as e:
+                print(f"✗ {ip}: errore {e}")
             return None
         
-        # Scansiona la rete locale (solo primi 20 IP per velocità)
+        # Scansiona un range più ampio (1-254)
         threads = []
-        for i in range(1, 21):
-            ip = network + str(i)
-            thread = threading.Thread(target=scan_ip, args=(ip,))
+        for i in range(1, 255):
+            ip = network_base + str(i)
+            thread = threading.Thread(target=scan_ip, args=(ip,), daemon=True)
             thread.start()
             threads.append(thread)
         
-        # Aspetta che tutte le scansioni finiscano
+        # Aspetta che tutte le scansioni finiscano (max 10 secondi)
+        start_time = time.time()
         for thread in threads:
-            thread.join()
+            remaining_time = 10 - (time.time() - start_time)
+            if remaining_time > 0:
+                thread.join(timeout=remaining_time)
+        
+        print(f"Scoperta completata. Peer trovati: {found_peers}")
+        return found_peers
+    
+    def test_peer_connection(self, peer_ip):
+        """Testa se un peer è realmente un soundboard"""
+        try:
+            # Invia un messaggio di test
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(3)
+            sock.connect((peer_ip, self.server_port))
+            
+            # Invia un messaggio di discovery
+            test_message = {
+                'type': 'peer_discovery',
+                'timestamp': time.time()
+            }
+            
+            data = pickle.dumps(test_message)
+            sock.send(data)
+            
+            # Aspetta risposta
+            response_data = sock.recv(1024)
+            if response_data:
+                response = pickle.loads(response_data)
+                if response.get('type') == 'peer_response':
+                    sock.close()
+                    return True
+            
+            sock.close()
+            return False
+            
+        except Exception as e:
+            print(f"Test connessione {peer_ip} fallito: {e}")
+            return False
     
     def broadcast_sound(self, row, col):
         """Invia il trigger del suono a tutti i peer"""
@@ -764,6 +872,7 @@ class Soundboard:
         main_menu.add_command(label="Salva Configurazione", command=self.save_config)
         main_menu.add_command(label="Carica Configurazione", command=self.load_config)
         main_menu.add_separator()
+        main_menu.add_command(label="Carica Audio su Tasto", command=self.load_audio_to_button)
         main_menu.add_command(label="Configurazione Party", command=self.open_party_dialog)
         main_menu.add_separator()
         main_menu.add_command(label="Esci", command=self.on_closing)
@@ -780,15 +889,54 @@ class Soundboard:
         
         ttk.Button(button_frame, text="Salva", command=self.save_config).pack(side=tk.LEFT, padx=2)
         ttk.Button(button_frame, text="Carica", command=self.load_config).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="+ Audio", command=self.load_audio_to_button).pack(side=tk.LEFT, padx=2)
         ttk.Button(button_frame, text="Party Mode", command=self.open_party_dialog).pack(side=tk.LEFT, padx=2)
         
         # Indicatore stato party
         self.party_status_label = ttk.Label(toolbar, text="Party: OFF", foreground="red")
         self.party_status_label.pack(side=tk.RIGHT, padx=10)
         
+        # Indicatore modalità selezione
+        self.selection_label = ttk.Label(toolbar, text="", foreground="blue")
+        self.selection_label.pack(side=tk.RIGHT, padx=10)
+        
+        # Modalità selezione tasto
+        self.selecting_button = False
+        
         # Aggiorna stato party ogni secondo
         self.update_party_status()
+    
+    def load_audio_to_button(self):
+        """Carica audio su un tasto selezionandolo"""
+        self.selecting_button = True
+        self.selection_label.config(text="Clicca su un tasto per caricare audio")
         
+        # Cambia il colore di tutti i tasti per indicare la modalità selezione
+        for row in self.buttons:
+            for button in row:
+                original_bg = button.button.cget('bg')
+                button.button.config(bg="yellow")
+                # Salva il colore originale
+                button.original_bg = original_bg
+        
+        # Bind temporaneo per la selezione
+        self.root.bind('<Escape>', self.cancel_selection)
+    
+    def cancel_selection(self, event=None):
+        """Annulla la modalità selezione"""
+        self.selecting_button = False
+        self.selection_label.config(text="")
+        
+        # Ripristina i colori originali
+        for row in self.buttons:
+            for button in row:
+                if hasattr(button, 'original_bg'):
+                    button.button.config(bg=button.original_bg)
+                    delattr(button, 'original_bg')
+        
+        # Rimuovi il bind temporaneo
+        self.root.unbind('<Escape>')
+    
     def setup_grid(self):
         # Frame per la griglia
         self.grid_frame = ttk.Frame(self.root)
