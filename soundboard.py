@@ -540,10 +540,49 @@ class SoundButton:
         self.context_menu.add_command(label="Rinomina", command=self.rename_button)
         self.context_menu.add_command(label="Rimuovi", command=self.clear_button)
         
-        self.button.bind("<Button-3>", self.show_context_menu)  # Click destro
+        # Binding per diversi sistemi operativi
+        self.button.bind("<Button-3>", self.show_context_menu)  # Click destro Windows/Linux
+        self.button.bind("<Button-2>", self.show_context_menu)  # Click centrale
+        self.button.bind("<Control-Button-1>", self.show_context_menu)  # Ctrl+Click per macOS
+        self.button.bind("<Double-Button-1>", self.load_audio)  # Doppio click per caricare audio
+        
+        # Supporto per drag and drop (macOS)
+        self.setup_drag_drop()
+        
+    def setup_drag_drop(self):
+        """Imposta il supporto per drag and drop (funziona meglio su macOS)"""
+        try:
+            # Prova a importare tkinterdnd2 se disponibile
+            import tkinterdnd2 as tkdnd
+            
+            # Abilita il drop di file
+            self.button.drop_target_register(tkdnd.DND_FILES)
+            self.button.dnd_bind('<<Drop>>', self.on_drop)
+        except ImportError:
+            # Se tkinterdnd2 non è disponibile, usa un approccio alternativo
+            pass
+    
+    def on_drop(self, event):
+        """Gestisce il drop di file sul tasto"""
+        files = event.data.split()
+        if files:
+            file_path = files[0].strip('{}')  # Rimuovi le parentesi graffe se presenti
+            
+            # Verifica se è un file audio
+            audio_extensions = ['.mp3', '.wav', '.ogg', '.m4a', '.flac']
+            if any(file_path.lower().endswith(ext) for ext in audio_extensions):
+                AudioTrimmer(self.parent.master, file_path, self.set_audio_data)
+            # Verifica se è un'immagine
+            elif any(file_path.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.gif', '.bmp']):
+                self.image_path = file_path
+                self.update_button_display()
         
     def show_context_menu(self, event):
-        self.context_menu.post(event.x_root, event.y_root)
+        try:
+            self.context_menu.post(event.x_root, event.y_root)
+        except:
+            # Se il menu contestuale fallisce, apri direttamente il caricamento audio
+            self.load_audio()
         
     def load_audio(self):
         file_path = filedialog.askopenfilename(
