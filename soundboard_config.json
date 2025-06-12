@@ -1,0 +1,308 @@
+{
+  "buttons": [
+    [
+      {
+        "label": "\\",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "1",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "2",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "3",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "4",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "5",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "6",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "7",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "8",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "9",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "0",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "'",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "\u00ec",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      }
+    ],
+    [
+      {
+        "label": "q",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "w",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "e",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "r",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "t",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "y",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "u",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "i",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "o",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "p",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "\u00e8",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "+",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      }
+    ],
+    [
+      {
+        "label": "a",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "s",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "d",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "f",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "g",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "h",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "j",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "k",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "l",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "\u00f2",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "\u00e0",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "\u00f9",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      }
+    ],
+    [
+      {
+        "label": "<",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "z",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "x",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "c",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "v",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "b",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "n",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "m",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": ",",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": ".",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      },
+      {
+        "label": "-",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      }
+    ],
+    [
+      {
+        "label": "space",
+        "sound_data": null,
+        "image_path": null,
+        "hotkey": null
+      }
+    ]
+  ]
+}

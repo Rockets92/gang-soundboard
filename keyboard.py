@@ -1,16 +1,22 @@
 import sys
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QFrame, QVBoxLayout, QGridLayout,
-    QPushButton, QGraphicsBlurEffect, QHBoxLayout, QGraphicsDropShadowEffect, QComboBox, QToolButton, QSlider, QLabel, QTabBar, QStackedLayout
+    QApplication, QMainWindow, QWidget, QFrame, QVBoxLayout, QGridLayout, QSizePolicy,
+    QPushButton, QGraphicsBlurEffect, QHBoxLayout, QGraphicsDropShadowEffect, QComboBox, QToolButton, QStackedLayout
 )
 from PyQt6.QtGui import QColor
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtCore import QSettings
+from PyQt6.QtCore import Qt, QTimer, QLocale
 from qt_material import apply_stylesheet
+import math
 
 class KeyboardWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        # Set initial window size and center before creating backing store
+        self.resize(900, 400)
+        screen = QApplication.primaryScreen().availableGeometry()
+        x = (screen.width() - self.width()) // 2
+        y = (screen.height() - self.height()) // 2
+        self.move(x, y)
         # Frameless and transparent window
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
@@ -36,18 +42,15 @@ class KeyboardWindow(QMainWindow):
             border: 1px solid rgba(255, 255, 255, 0.4);
             border-radius: 20px;
         """)
-        bg_blur = QGraphicsBlurEffect(self.background_frame)
-        bg_blur.setBlurRadius(50)
-        self.background_frame.setGraphicsEffect(bg_blur)
         
         # Layer 2: keyboard widget container (no blur)
         self.keyboard_frame = QWidget(self.glass_container)
         
         # Stack layers
         stack = QStackedLayout(self.glass_container)
+        stack.setStackingMode(QStackedLayout.StackingMode.StackAll)
         stack.addWidget(self.background_frame)
         stack.addWidget(self.keyboard_frame)
-        stack.setCurrentWidget(self.keyboard_frame)
         self.glass_container.setLayout(stack)
         # Prepare keyboard_frame layout (only once)
         self.keyboard_layout = QVBoxLayout(self.keyboard_frame)
@@ -58,31 +61,10 @@ class KeyboardWindow(QMainWindow):
         self.keyboard_layout.addLayout(self.grid_layout)
 
 
-        # Costruzione dinamica della tastiera in base alle preferenze salvate
-        settings    = QSettings("GangSoundboard", "KeyboardApp")
-        layout_type = settings.value("size_combo", "65%")
-        key_format  = settings.value("format_combo", "ANSI")
-        lang        = settings.value("lang_combo", "US English")
-
-        if layout_type in ["60%", "65%", "TKL"]:
-            rows = [
-                ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
-                ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
-                ['Z', 'X', 'C', 'V', 'B', 'N', 'M']
-            ]
-        elif layout_type == "75%":
-            rows = [
-                ['Esc', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Del'],
-                ['Tab', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';'],
-                ['Shift', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', ',', '.']
-            ]
-        else:
-            rows = [
-                ['Esc', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'Del'],
-                ['Tab', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']'],
-                ['Caps', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';', '\''],
-                ['Shift', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', ',', '.', '/', 'Shift']
-            ]
+        # Fixed keyboard settings
+        self.layout_type = "60%"
+        self.key_format = "ISO"
+        self.lang = QLocale.system().name()
 
 
         # Add drop shadow to keyboard container for 3D effect
@@ -123,165 +105,8 @@ class KeyboardWindow(QMainWindow):
             """)
             title_layout.addWidget(btn)
         main_layout.addLayout(title_layout)
-        # Tab bar for Mac/Windows selection
-        tab_bar = QTabBar()
-        tab_bar.addTab("Windows")
-        tab_bar.addTab("Mac")
-        tab_bar.setDrawBase(False)
-        tab_bar.setExpanding(False)
-        tab_bar.setStyleSheet("""
-            QTabBar {
-                background: transparent;
-                border: none;
-            }
-            QTabBar::tab {
-                background-color: rgba(255,255,255,0.15);
-                border: none;
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
-                padding: 8px 16px;
-                margin-right: 4px;
-                color: #3A76A5;
-                font-weight: bold;
-            }
-            QTabBar::tab:last {
-                margin-right: 0;
-            }
-            QTabBar::tab:selected {
-                background-color: rgba(255,255,255,0.35);
-                border-bottom: 3px solid #3A76A5;
-            }
-        """)
-        shadow = QGraphicsDropShadowEffect(tab_bar)
-        shadow.setBlurRadius(15)
-        shadow.setOffset(0, 2)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        tab_bar.setGraphicsEffect(shadow)
-        # Tab bar and volume slider
-        self.tab_bar = tab_bar
-        slider = QSlider(Qt.Orientation.Horizontal)
-        slider.setRange(0, 100)
-        slider.setValue(50)
-        slider.setFixedHeight(20)
-        slider.setStyleSheet("""
-            QSlider::groove:horizontal {
-                background: transparent;
-                height: 8px;
-                border-radius: 4px;
-            }
-            QSlider::handle:horizontal {
-                background: rgba(255,255,255,0.9);
-                border: none;
-                width: 16px;
-                margin: -4px 0;
-                border-radius: 8px;
-            }
-        """)
-        # Label for volume slider
-        volume_label = QLabel("Volume")
-        volume_label.setStyleSheet("""
-            background: transparent;
-            color: #ffffff;
-            font-size: 16px;
-            padding-right: 8px;
-        """)
-        self.slider = slider
-        slider.valueChanged.connect(lambda val: self.settings.setValue("volume_slider", val))
-
-        # Place tabs, label, and slider in a transparent container with fixed width and space-between alignment
-        tab_slider_container = QWidget()
-        tab_slider_container.setStyleSheet("background: transparent;")
-        tab_slider_container.setFixedWidth(750)
-
-        tab_slider_layout = QHBoxLayout(tab_slider_container)
-        tab_slider_layout.setContentsMargins(0, 0, 0, 0)
-        tab_slider_layout.setSpacing(8)
-        tab_slider_layout.addWidget(tab_bar)
-        tab_slider_layout.addStretch()
-        tab_slider_layout.addWidget(volume_label)
-        tab_slider_layout.addWidget(slider)
-
-        top_hbox = QHBoxLayout()
-        top_hbox.addStretch()
-        top_hbox.addWidget(tab_slider_container)
-        top_hbox.addStretch()
-        main_layout.addLayout(top_hbox)
-        # Dropdown controls at top of window
-        controls_layout = QHBoxLayout()
-        controls_layout.setSpacing(10)
-        size_combo = QComboBox()
-        size_combo.addItems(['60%', '65%', '75%', '80%', '100%', 'TKL', '1800'])
-        format_combo = QComboBox()
-        format_combo.addItems(['ANSI', 'ISO', 'JIS'])
-        lang_combo = QComboBox()
-        lang_combo.addItems(['US English', 'UK English', 'DE', 'FR', 'IT', 'ES'])
-        for combo in (size_combo, format_combo, lang_combo):
-            combo.setStyleSheet("""
-                QComboBox {
-                    background-color: rgba(255, 255, 255, 0.15);
-                    border: 1px solid rgba(255, 255, 255, 0.4);
-                    border-radius: 8px;
-                    color: #3A76A5;
-                    padding: 5px;
-                }
-                QComboBox::drop-down {
-                    border: none;
-                }
-                QComboBox QAbstractItemView {
-                    background-color: rgba(255, 255, 255, 0.9);
-                    border: 1px solid rgba(255, 255, 255, 0.4);
-                    border-radius: 8px;
-                    selection-background-color: rgba(92, 167, 219, 0.2);
-                    selection-color: #3A76A5;
-                    outline: none;
-                }
-                QComboBox QAbstractItemView::item {
-                    padding: 8px;
-                }
-            """)
-            shadow = QGraphicsDropShadowEffect(combo)
-            shadow.setBlurRadius(15)
-            shadow.setOffset(0, 2)
-            shadow.setColor(QColor(0, 0, 0, 80))
-            combo.setGraphicsEffect(shadow)
-            controls_layout.addWidget(combo)
-        # QSettings for persistence and combo attributes
-        self.settings = QSettings("GangSoundboard", "KeyboardApp")
-        self.size_combo = size_combo
-        self.format_combo = format_combo
-        self.lang_combo = lang_combo
-        # Connetti segnali per salvare le modifiche
-        size_combo.currentTextChanged.connect(lambda val: (self.settings.setValue("size_combo", val), self.build_keyboard()))
-        format_combo.currentTextChanged.connect(lambda val: (self.settings.setValue("format_combo", val), self.build_keyboard()))
-        lang_combo.currentTextChanged.connect(lambda val: (self.settings.setValue("lang_combo", val), self.build_keyboard()))
-        # Salva l'indice del tab selezionato
-        tab_bar.currentChanged.connect(lambda index: self.settings.setValue("tab_index", index))
-        # QSettings per persistenza
-        self.settings = QSettings("GangSoundboard", "KeyboardApp")
-
-        # Ripristina i valori salvati
-        size_combo.setCurrentText(self.settings.value("size_combo", "65%"))
-        format_combo.setCurrentText(self.settings.value("format_combo", "ANSI"))
-        lang_combo.setCurrentText(self.settings.value("lang_combo", "US English"))
-        slider.setValue(int(self.settings.value("volume_slider", 50)))
-        tab_bar.setCurrentIndex(int(self.settings.value("tab_index", 0)))
-        # Center dropdown controls above keyboard
-        ctrl_hbox = QHBoxLayout()
-        ctrl_hbox.addStretch()
-        ctrl_hbox.addLayout(controls_layout)
-        ctrl_hbox.addStretch()
-        main_layout.addLayout(ctrl_hbox)
-        main_layout.addStretch()
 
 
-        # Keep track of combos and spacing
-        self.combos = [size_combo, format_combo, lang_combo]
-        self.size_combo = size_combo
-        self.format_combo = format_combo
-        self.lang_combo = lang_combo
-        self.controls_spacing = controls_layout.spacing()
-        QTimer.singleShot(0, self.adjust_combo_widths)
-        # Schedule initial keyboard build after the window is shown
         QTimer.singleShot(0, self.build_keyboard)
 
         # Center glass container horizontally
@@ -294,12 +119,6 @@ class KeyboardWindow(QMainWindow):
         main_layout.addLayout(hbox)
         main_layout.addStretch()
 
-        # Window size and centering
-        self.resize(900, 900)
-        screen = QApplication.primaryScreen().availableGeometry()
-        x = (screen.width() - self.width()) // 2
-        y = (screen.height() - self.height()) // 2
-        self.move(x, y)
 
     def toggleMaxRestore(self):
         if self.isMaximized():
@@ -307,69 +126,32 @@ class KeyboardWindow(QMainWindow):
         else:
             self.showMaximized()
 
-    def adjust_combo_widths(self):
-        # Make combo widths equal so that total equals keyboard width
-        width = self.glass_container.width()
-        total_spacing = self.controls_spacing * (len(self.combos) - 1)
-        if width > total_spacing:
-            cw = int((width - total_spacing) / len(self.combos))
-            for combo in self.combos:
-                combo.setFixedWidth(cw)
-        # Keep slider width matching tab_bar width
-        slider_width = self.tab_bar.width()
-        self.slider.setFixedWidth(slider_width)
-
     def build_keyboard(self):
-        # Determine key layout based on dropdown
-        layout_type = self.size_combo.currentText()
-        if layout_type == "60%":
-            rows = [
-                ['Esc','1','2','3','4','5','6','7','8','9','0','-','=','Backspace'],
-                ['Tab','Q','W','E','R','T','Y','U','I','O','P','[',']','\\'],
-                ['Caps','A','S','D','F','G','H','J','K','L',';','\'','Enter'],
-                ['Shift','Z','X','C','V','B','N','M',',','.','/','Shift'],
-                ['Ctrl','Win','Alt','Space','Alt','Fn','Ctrl']
-            ]
-        elif layout_type == "65%":
-            rows = [
-                ['Esc','1','2','3','4','5','6','7','8','9','0','-','=','Backspace'],
-                ['Tab','Q','W','E','R','T','Y','U','I','O','P','[',']','\\'],
-                ['Caps','A','S','D','F','G','H','J','K','L',';','\'','Enter'],
-                ['Shift','Z','X','C','V','B','N','M',',','.','/','Shift'],
-                ['Ctrl','Win','Alt','Space','Alt']
-            ]
-        elif layout_type == "TKL":
-            rows = [
-                ['Esc','1','2','3','4','5','6','7','8','9','0','Backspace'],
-                ['Tab','Q','W','E','R','T','Y','U','I','O','P','[',']'],
-                ['Caps','A','S','D','F','G','H','J','K','L',';','\''],
-                ['Shift','Z','X','C','V','B','N','M',',','.','/','Shift'],
-                ['Ctrl','Win','Alt','Space','Alt','Fn','Ctrl']
-            ]
-        elif layout_type == "75%":
-            rows = [
-                ['Esc','Q','W','E','R','T','Y','U','I','O','P','Del'],
-                ['Tab','A','S','D','F','G','H','J','K','L',';'],
-                ['Shift','Z','X','C','V','B','N','M',',','.'],
-            ]
-        else:
-            rows = [
-                ['Esc','1','2','3','4','5','6','7','8','9','0','Del'],
-                ['Tab','Q','W','E','R','T','Y','U','I','O','P','[',']'],
-                ['Caps','A','S','D','F','G','H','J','K','L',';','\''],
-                ['Shift','Z','X','C','V','B','N','M',',','.','/','Shift']
-            ]
+        # Key layout (Windows)
+        rows = [
+            ['Esc','1','2','3','4','5','6','7','8','9','0','-','=','Backspace'],
+            ['Tab','Q','W','E','R','T','Y','U','I','O','P','[',']','\\'],
+            ['Caps','A','S','D','F','G','H','J','K','L',';','\'','Enter'],
+            ['Shift','Z','X','C','V','B','N','M',',','.','/','Shift'],
+            ['Ctrl','Win','Alt','Space','Alt','Fn','Ctrl']
+        ]
         key_spans = {
-            'Tab':1.5, 'Caps':1.75, 'Shift':2.25, 'Enter':2,
-            'Backspace':2, 'Del':1.5, 'Space':6, 'Esc':1.25
+            'Tab': 1.5, 'Caps': 1.75, 'Shift': 2.25,
+            'Enter': 2, 'Backspace': 2, 'Space': 6,
+            'Esc': 1.25, 'Fn': 1
         }
         # Dynamic sizing: calculate key dimensions to fit the frame
         margins = 20
         spacing = 12
         rows_count = len(rows)
         max_span = max(sum(key_spans.get(k, 1) for k in row_keys) for row_keys in rows)
-        avail_w = self.keyboard_frame.width() - 2 * margins
-        avail_h = self.keyboard_frame.height() - 2 * margins
+        # Clamp frame dimensions to the window size to avoid excessively large buffers
+        max_w = self.width()
+        max_h = self.height()
+        frame_w = min(self.keyboard_frame.width(), max_w)
+        frame_h = min(self.keyboard_frame.height(), max_h)
+        avail_w = frame_w - 2 * margins
+        avail_h = frame_h - 2 * margins
         if avail_w <= 0 or avail_h <= 0:
             # Fallback to default key size before layout is applied
             cell_w = 60
@@ -383,13 +165,23 @@ class KeyboardWindow(QMainWindow):
             w = item.widget()
             if w:
                 w.deleteLater()
+        # Ensure uniform column width to prevent key overlap
+        num_cols = math.ceil(max_span)
+        for col in range(num_cols):
+            self.grid_layout.setColumnMinimumWidth(col, math.ceil(cell_w))
+        # Evenly distribute any extra space across all columns to prevent key overlap
+        for col in range(num_cols):
+            self.grid_layout.setColumnStretch(col, 1)
         # Populate grid
         for r, row_keys in enumerate(rows):
             c = 0
             for key in row_keys:
                 span = key_spans.get(key,1)
+                span_int = math.ceil(span)
                 btn = QPushButton(key)
-                btn.setFixedSize(int(cell_w * span + (span - 1) * spacing), int(cell_h))
+                btn.setFixedHeight(int(cell_h))
+                btn.setMinimumWidth(int(cell_w * span_int + (span_int - 1) * spacing))
+                btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
                 btn.setStyleSheet('''
 QPushButton {
     background-color: rgba(255, 255, 255, 0.15);
@@ -411,18 +203,27 @@ QPushButton:pressed {
                 shadow.setOffset(0,4)
                 shadow.setColor(QColor(0,0,0,80))
                 btn.setGraphicsEffect(shadow)
-                self.grid_layout.addWidget(btn, r, c, 1, int(span))
-                c += int(span)
+                self.grid_layout.addWidget(btn, r, c, 1, span_int)
+                c += span_int
 
         # Adjust glass container size to fit new layout
-        total_width = int(cell_w * max_span + (max_span - 1) * spacing + 2 * margins)
+        total_width = num_cols * math.ceil(cell_w) + (num_cols - 1) * spacing + 2 * margins
         total_height = int(cell_h * rows_count + (rows_count - 1) * spacing + 2 * margins)
         self.glass_container.setFixedSize(total_width, total_height)
+        # Apply blur after sizing to avoid giant offscreen buffers
+        if not hasattr(self, '_blur_initialized'):
+            blur = QGraphicsBlurEffect(self.background_frame)
+            blur.setBlurRadius(50)
+            self.background_frame.setGraphicsEffect(blur)
+            self._blur_initialized = True
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.adjust_combo_widths()
+        self.build_keyboard()
       
+    def on_tab_changed(self, index):
+        # Rebuild keyboard when platform tab changes
+        self.build_keyboard()
 
 def main():
     app = QApplication(sys.argv)

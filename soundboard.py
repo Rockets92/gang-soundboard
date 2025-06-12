@@ -5,7 +5,6 @@ import json
 import os
 from PIL import Image, ImageTk
 import threading
-import keyboard
 import numpy as np
 import wave
 import io
@@ -349,8 +348,19 @@ class SoundButton:
             self.button.config(text=display_text, image="", compound=tk.NONE,
                              bg="lightgreen" if self.sound_data else "lightgray")
             
+    def highlight(self, duration=200):
+        """Visually highlight the button briefly."""
+        try:
+            orig_bg = self.button.cget('bg')
+            self.button.config(bg='yellow')
+            # Restore original background after duration milliseconds
+            self.button.after(duration, lambda: self.button.config(bg=orig_bg))
+        except Exception:
+            pass
+
     def play_sound(self):
         if self.sound_object:
+            self.highlight()
             # Riproduci il suono in un thread separato
             threading.Thread(target=self.sound_object.play, daemon=True).start()
             
@@ -401,6 +411,11 @@ class Soundboard:
         # Griglia 4x5 di tasti
         self.buttons = []
         self.setup_ui()
+
+        # Mappa tasti logici a SoundButton e lega binding
+        self.key_map = {}
+        self.root.bind_all("<KeyPress>", self.on_keypress)
+
         self.setup_grid()
         
         # Configurazione della finestra ridimensionabile
@@ -434,20 +449,56 @@ class Soundboard:
         # Frame per la griglia
         self.grid_frame = ttk.Frame(self.root)
         self.grid_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=5, pady=5)
-        
-        # Configura la griglia per essere ridimensionabile
-        for i in range(4):
+
+        # Define rows of keyboard keys
+        keyboard_rows = [
+            ["\\", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "'", "ì"],
+            list("qwertyuiopè+"),
+            list("asdfghjklòàù"),
+            list("<zxcvbnm,.-"),
+            ["space"]
+        ]
+
+        # Clear existing buttons list
+        self.buttons = []
+
+        # Configure grid rows and columns dynamically
+        max_cols = max(len(r) for r in keyboard_rows)
+        for i in range(max_cols):
             self.grid_frame.columnconfigure(i, weight=1)
-        for i in range(5):
+        for i in range(len(keyboard_rows)):
             self.grid_frame.rowconfigure(i, weight=1)
-            
-        # Crea i tasti
-        for row in range(5):
+
+        # Ensure each grid cell stays square on resize
+        def resize_cells(event):
+            cell_size = int(min(event.width / max_cols, event.height / len(keyboard_rows)))
+            for col in range(max_cols):
+                self.grid_frame.columnconfigure(col, minsize=cell_size)
+            for row in range(len(keyboard_rows)):
+                self.grid_frame.rowconfigure(row, minsize=cell_size)
+        self.grid_frame.bind("<Configure>", resize_cells)
+
+        # Crea i tasti basati sui tasti della tastiera
+        for row_idx, key_row in enumerate(keyboard_rows):
             button_row = []
-            for col in range(4):
-                btn = SoundButton(self.grid_frame, row, col, self.button_callback)
+            for col_idx, key in enumerate(key_row):
+                btn = SoundButton(self.grid_frame, row_idx, col_idx, self.button_callback)
+                # Set label to the keyboard key
+                btn.label = key
+                btn.update_button_display()
+                # Registra il tasto nella mappa per il binding Tkinter
+                self.key_map[key] = btn
                 button_row.append(btn)
             self.buttons.append(button_row)
+
+    def on_keypress(self, event):
+        # Gestisce la pressione di un tasto fisico
+        key = event.char
+        if not key and event.keysym.lower() == "space":
+            key = "space"
+        btn = self.key_map.get(key)
+        if btn:
+            btn.play_sound()
             
     def button_callback(self, button):
         # Callback per i tasti (se necessario)
